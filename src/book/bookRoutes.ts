@@ -1,18 +1,27 @@
-import path from "node:path";
 import express from "express";
-import createBook from "./bookController.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import multer from "multer";
-const bookRouter = express.Router();
+import createBook from "./bookController.js";
 
-const upload = multer({
-    dest: path.resolve(__dirname,'../../public/data/uploads'),
-    limits:{fileSize: 3e7},
+// 👇 ESM replacement for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const router = express.Router();
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.resolve(__dirname, "../../public/data/uploads"));
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
 });
-//routes
-bookRouter.post("/", upload.fields([
-    {name: "coverImage" , maxCount:1},
-    {name:"file", maxCount:1}
-]) ,createBook);
-// bookRouter.get("/login", loginUser);
 
-export default bookRouter;
+const upload = multer({ storage });
+
+// example route
+router.post("/upload", upload.single("file"), createBook);
+
+export default router;
