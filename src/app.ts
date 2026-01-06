@@ -1,25 +1,34 @@
 import express from "express";
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response } from "express";
 import createHttpError from "http-errors";
 import globalErrorHandler from "./middlewares/globalErrorHandler.js";
 import userRouter from "./user/userRouter.js";
 import bookRouter from "./book/bookRoutes.js";
+
 const app = express();
+
+// Middleware
 app.use(express.json());
 
-
-app.get("/", (req: Request, res: Response) => {
-  const error = createHttpError(400, "something went wrong");
-  throw error;
-
-  res.json({ message: "welcome to elib apis" });
+// Health check route
+app.get("/", (_req: Request, res: Response) => {
+  res.json({ 
+    success: true,
+    message: "Welcome to eLib API",
+    version: "1.0.0"
+  });
 });
 
-//routes
-app.use('/api/users',userRouter);
-app.use('/api/books',bookRouter);
+// Routes
+app.use("/api/users", userRouter);
+app.use("/api/books", bookRouter);
 
-//GlobalError
+// 404 handler
+app.use((_req: Request, _res: Response) => {
+  throw createHttpError(404, "Route not found");
+});
+
+// Global error handler (must be last)
 app.use(globalErrorHandler);
 
-export default app;
+export default app; 

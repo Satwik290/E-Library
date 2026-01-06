@@ -1,54 +1,29 @@
 import express from "express";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
 
+import authenticate from "../middlewares/authenticate.js";
 import {
   createBook,
-  deleteBook,
-  getSingleBook,
-  listBooks,
   updateBook,
+  deleteBook,
+  listBooks,
+  getSingleBook,
 } from "./bookController.js";
-import authenticate from "../middlewares/authenticate.js";
 
 const router = express.Router();
 
-/* ------------------ ES MODULE __dirname FIX ------------------ */
+/* ES MODULE dirname */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ------------------ MULTER CONFIG ------------------ */
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, path.resolve(__dirname, "../../public/data/uploads"));
-  },
-  filename: (_req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${uniqueName}${path.extname(file.originalname)}`);
-  },
-});
-
-const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
-  if (
-    file.mimetype.startsWith("image/") ||
-    file.mimetype === "application/pdf"
-  ) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only images and PDFs are allowed"));
-  }
-};
-
+/* Multer disk storage */
 const upload = multer({
-  storage,
-  fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-  },
+  dest: path.resolve(__dirname, "../../public/data/uploads"),
+  limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-/* ------------------ ROUTES ------------------ */
 router.post(
   "/",
   authenticate,

@@ -1,29 +1,28 @@
-import mongoose from "mongoose";
-import type { Book } from "./bookTypes.js";
+import mongoose, { Schema, Document } from "mongoose";
+import type { BookType } from "./bookTypes.js";
 
-const bookSchema = new mongoose.Schema<Book>({
-    title: {
-        type: String,
-        required:true,
-    },
-    author:{
-        type: mongoose.Schema.Types.ObjectId,
-        required: true,
-    },
-    coverImage:{
-        type: String,
-        required:true,
-    },
-    file:{
-        type: String,
-        required:true,
-    },
-    genre:{
-        type: String,
-        required:true,
-    }
+export interface BookDocument extends BookType, Document {}
 
-},{timestamps:true});
+const bookSchema = new Schema<BookDocument>(
+  {
+    title: { type: String, required: true },
+    author: { type: String, required: true },
+    description: String,
+    price: Number,
 
+    coverImage: {
+      url: { type: String, required: true },
+      publicId: { type: String, required: true },
+    },
 
-export default mongoose.model<Book>("Book", bookSchema);
+    file: {
+      url: { type: String, required: true },
+      publicId: { type: String, required: true },
+    },
+
+    createdBy: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+export default mongoose.model<BookDocument>("Book", bookSchema);

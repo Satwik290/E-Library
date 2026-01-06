@@ -1,6 +1,7 @@
-import type { Request, Response, NextFunction } from "express";
+import  type { Request, Response, NextFunction } from "express";
 import createHttpError from "http-errors";
 import fs from "fs";
+import path from "path";
 
 import Book from "./bookModel.js";
 import {
@@ -8,137 +9,69 @@ import {
   deleteFromCloudinary,
 } from "../utils/cloudinaryHelpers.js";
 
-/* =========================================================
-   CREATE BOOK
-========================================================= */
-export const createBook = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+/* CREATE */
+export const createBook = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { title, author, description, price } = req.body;
 
-    if (!title || !author) {
-      return next(createHttpError(400, "Title and author are required"));
-    }
+    if (!title || !author) return next(createHttpError(400, "Title & author required"));
 
-    const files = req.files as
-      | {
-          coverImage?: Express.Multer.File[];
-          file?: Express.Multer.File[];
-        }
-      | undefined;
+    const files = req.files as any;
+    if (!files?.coverImage || !files?.file)
+      return next(createHttpError(400, "Cover image & file required"));
 
-    if (!files?.coverImage || !files?.file) {
-      return next(
-        createHttpError(400, "Cover image and book file are required")
-      );
-    }
-
-    const coverImageFile = files.coverImage[0];
+    const cover = files.coverImage[0];
     const bookFile = files.file[0];
 
-    /* ---------- Upload to Cloudinary ---------- */
-    const coverImageUpload = await uploadToCloudinary(
-      coverImageFile.path,
-      "books/covers",
-      "image"
-    );
+    const coverPath = path.join(cover.destination, cover.filename);
+    const filePath = path.join(bookFile.destination, bookFile.filename);
 
-    const bookFileUpload = await uploadToCloudinary(
-      bookFile.path,
-      "books/files",
-      "raw"
-    );
+    const coverUpload = await uploadToCloudinary(coverPath, "books/covers", "image");
+    const fileUpload = await uploadToCloudinary(filePath, "books/files", "raw");
 
-    /* ---------- Remove local files ---------- */
-    fs.unlinkSync(coverImageFile.path);
-    fs.unlinkSync(bookFile.path);
+    fs.unlinkSync(coverPath);
+    fs.unlinkSync(filePath);
 
     const book = await Book.create({
       title,
       author,
       description,
       price,
-      coverImage: {
-        url: coverImageUpload.secure_url,
-        publicId: coverImageUpload.public_id,
-      },
-      file: {
-        url: bookFileUpload.secure_url,
-        publicId: bookFileUpload.public_id,
-      },
-      createdBy: req.userId,
+      coverImage: { url: coverUpload.secure_url, publicId: coverUpload.public_id },
+      file: { url: fileUpload.secure_url, publicId: fileUpload.public_id },
+      createdBy: req.userId!,
     });
 
-    res.status(201).json({
-      success: true,
-      message: "Book created successfully",
-      data: book,
-    });
-  } catch (error) {
-    next(error);
+    res.status(201).json({ success: true, data: book });
+  } catch (e) {
+    next(e);
   }
 };
 
-/* =========================================================
-   UPDATE BOOK
-========================================================= */
-export const updateBook = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+/* UPDATE */
+export const updateBook = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { bookId } = req.params;
-    const book = await Book.findById(bookId);
+    const book = await Book.findById(req.params.bookId);
+    if (!book) return next(createHttpError(404, "Book not found"));
 
-    if (!book) {
-      return next(createHttpError(404, "Book not found"));
-    }
+    const files = req.files as any;
 
-    const files = req.files as
-      | {
-          coverImage?: Express.Multer.File[];
-          file?: Express.Multer.File[];
-        }
-      | undefined;
-
-    /* ---------- Update Cover Image ---------- */
     if (files?.coverImage?.[0]) {
+      const f = files.coverImage[0];
+      const p = path.join(f.destination, f.filename);
       await deleteFromCloudinary(book.coverImage.publicId, "image");
-
-      const upload = await uploadToCloudinary(
-        files.coverImage[0].path,
-        "books/covers",
-        "image"
-      );
-
-      fs.unlinkSync(files.coverImage[0].path);
-
-      book.coverImage = {
-        url: upload.secure_url,
-        publicId: upload.public_id,
-      };
+      const u = await uploadToCloudinary(p, "books/covers", "image");
+      fs.unlinkSync(p);
+      book.coverImage = { url: u.secure_url, publicId: u.public_id };
     }
 
-    /* ---------- Update Book File ---------- */
     if (files?.file?.[0]) {
+      const f = files.file[0];
+      const p = path.join(f.destination, f.filename);
       await deleteFromCloudinary(book.file.publicId, "raw");
-
-      const upload = await uploadToCloudinary(
-        files.file[0].path,
-        "books/files",
-        "raw"
-      );
-
-      fs.unlinkSync(files.file[0].path);
-
-      book.file = {
-        url: upload.secure_url,
-        publicId: upload.public_id,
-      };
+      const u = await uploadToCloudinary(p, "books/files", "raw");
+      fs.unlinkSync(p);
+      book.file = { url: u.secure_url, publicId: u.public_id };
     }
 
     book.title = req.body.title ?? book.title;
@@ -147,44 +80,32 @@ export const updateBook = async (
     book.price = req.body.price ?? book.price;
 
     await book.save();
-
-    res.json({
-      success: true,
-      message: "Book updated successfully",
-      data: book,
-    });
-  } catch (error) {
-    next(error);
+    res.json({ success: true, data: book });
+  } catch (e) {
+    next(e);
   }
 };
 
-/* =========================================================
-   DELETE BOOK
-========================================================= */
-export const deleteBook = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { bookId } = req.params;
-    const book = await Book.findById(bookId);
+/* GET */
+export const listBooks = async (_: Request, res: Response) => {
+  const books = await Book.find().sort({ createdAt: -1 });
+  res.json({ success: true, data: books });
+};
 
-    if (!book) {
-      return next(createHttpError(404, "Book not found"));
-    }
+export const getSingleBook = async (req: Request, res: Response, next: NextFunction) => {
+  const book = await Book.findById(req.params.bookId);
+  if (!book) return next(createHttpError(404, "Book not found"));
+  res.json({ success: true, data: book });
+};
 
-    /* ---------- Cloudinary Cleanup ---------- */
-    await deleteFromCloudinary(book.coverImage.publicId, "image");
-    await deleteFromCloudinary(book.file.publicId, "raw");
+/* DELETE */
+export const deleteBook = async (req: Request, res: Response, next: NextFunction) => {
+  const book = await Book.findById(req.params.bookId);
+  if (!book) return next(createHttpError(404, "Book not found"));
 
-    await book.deleteOne();
+  await deleteFromCloudinary(book.coverImage.publicId, "image");
+  await deleteFromCloudinary(book.file.publicId, "raw");
+  await book.deleteOne();
 
-    res.json({
-      success: true,
-      message: "Book deleted successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
+  res.json({ success: true, message: "Book deleted successfully" });
 };

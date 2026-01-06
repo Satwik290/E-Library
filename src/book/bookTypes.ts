@@ -1,11 +1,14 @@
-import type { User } from "../user/userTypes.js";
-export interface Book {
-    id: string;
-    title: string;
-    author: User;
-    genre: string;
-    coverImage:string;
-    file: string;
-    createdAt: Date;
-    updatedAt: Date;
-};
+export interface CloudinaryFile {
+  url: string;
+  publicId: string;
+}
+
+export interface BookType {
+  title: string;
+  author: string;
+  description?: string;
+  price?: number;
+  coverImage: CloudinaryFile;
+  file: CloudinaryFile;
+  createdBy: string;
+}

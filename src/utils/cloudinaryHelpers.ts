@@ -8,6 +8,8 @@ export const uploadToCloudinary = async (
   return cloudinary.uploader.upload(filePath, {
     folder,
     resource_type: resourceType,
+    use_filename: true,
+    unique_filename: true,
   });
 };
 
@@ -16,7 +18,5 @@ export const deleteFromCloudinary = async (
   resourceType: "image" | "raw"
 ) => {
   if (!publicId) return;
-  await cloudinary.uploader.destroy(publicId, {
-    resource_type: resourceType,
-  });
+  await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 };
